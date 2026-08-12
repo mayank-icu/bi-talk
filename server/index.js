@@ -116,7 +116,11 @@ async function saveRoomData(room, data) {
       await redis.set(`room:${room}`, payload, { ex: ROOM_TTL_SECONDS });
       return;
     } catch (e) {
-      console.error('[RoomStore] Redis set error:', e.message);
+      if (e.message && e.message.includes('NOPERM')) {
+        console.error('❌ [RoomStore] UPSTASH PERMISSION ERROR: Your UPSTASH_REDIS_REST_TOKEN is Read-Only! Please replace it with the Read-Write token from Upstash console.');
+      } else {
+        console.error('[RoomStore] Redis set error:', e.message);
+      }
     }
   }
   memoryRooms.set(room, data);
