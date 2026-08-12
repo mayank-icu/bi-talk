@@ -8,7 +8,6 @@ const multer = require('multer');
 const fetch = require('node-fetch');
 const path = require('path');
 const FormData = require('form-data');
-const { getStore } = require('@netlify/blobs');
 
 const app = express();
 const server = http.createServer(app);
@@ -62,53 +61,60 @@ apiRouter.get('/ice-servers', (req, res) => {
 });
 
 // ─── HTTP Signaling for Serverless / Netlify Fallback ─────────────────────────
+// Uses Upstash Redis (HTTP-based) for persistent shared state across serverless invocations.
+// Falls back to in-memory Map for local development when UPSTASH env vars aren't set.
+const { Redis } = require('@upstash/redis');
+
 const memoryRooms = new Map();
 
-function getBlobStore() {
-  try {
-    if (process.env.NETLIFY || process.env.NETLIFY_BLOBS_CONTEXT || process.env.SITE_ID) {
-      return getStore('rooms');
-    }
-  } catch (err) {
-    console.warn('[RoomStore] Netlify Blobs not initialized, using memory store fallback:', err.message);
+let _redis = null;
+function getRedis() {
+  if (_redis) return _redis;
+  const url = process.env.UPSTASH_REDIS_REST_URL;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  if (url && token) {
+    _redis = new Redis({ url, token });
+    return _redis;
   }
   return null;
 }
 
+const ROOM_TTL_SECONDS = 300; // auto-expire rooms after 5 min of inactivity
+
 async function getRoomData(room) {
-  const store = getBlobStore();
-  if (store) {
+  const redis = getRedis();
+  if (redis) {
     try {
-      const data = await store.get(room, { type: 'json' });
+      const data = await redis.get(`room:${room}`);
       return data || null;
     } catch (e) {
-      console.warn('[RoomStore] Blob get error:', e.message);
+      console.warn('[RoomStore] Redis get error:', e.message);
     }
   }
   return memoryRooms.get(room) || null;
 }
 
 async function saveRoomData(room, data) {
-  const store = getBlobStore();
-  if (store) {
+  const redis = getRedis();
+  if (redis) {
     try {
-      await store.setJSON(room, data);
+      await redis.set(`room:${room}`, data, { ex: ROOM_TTL_SECONDS });
       return;
     } catch (e) {
-      console.warn('[RoomStore] Blob set error:', e.message);
+      console.warn('[RoomStore] Redis set error:', e.message);
     }
   }
   memoryRooms.set(room, data);
 }
 
 async function deleteRoomData(room) {
-  const store = getBlobStore();
-  if (store) {
+  const redis = getRedis();
+  if (redis) {
     try {
-      await store.delete(room);
+      await redis.del(`room:${room}`);
       return;
     } catch (e) {
-      console.warn('[RoomStore] Blob delete error:', e.message);
+      console.warn('[RoomStore] Redis del error:', e.message);
     }
   }
   memoryRooms.delete(room);
