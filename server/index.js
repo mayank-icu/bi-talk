@@ -97,12 +97,12 @@ async function getRoomData(room) {
   if (redis) {
     try {
       let data = await redis.get(`room:${room}`);
-      if (typeof data === 'string') {
-        try { data = JSON.parse(data); } catch {}
+      if (data && typeof data === 'string') {
+        try { data = JSON.parse(data); } catch (e) { console.warn('[RoomStore] JSON parse error:', e.message); }
       }
       return data || null;
     } catch (e) {
-      console.warn('[RoomStore] Redis get error:', e.message);
+      console.error('[RoomStore] Redis get error:', e.message);
     }
   }
   return memoryRooms.get(room) || null;
@@ -112,10 +112,11 @@ async function saveRoomData(room, data) {
   const redis = getRedis();
   if (redis) {
     try {
-      await redis.set(`room:${room}`, data, { ex: ROOM_TTL_SECONDS });
+      const payload = typeof data === 'string' ? data : JSON.stringify(data);
+      await redis.set(`room:${room}`, payload, { ex: ROOM_TTL_SECONDS });
       return;
     } catch (e) {
-      console.warn('[RoomStore] Redis set error:', e.message);
+      console.error('[RoomStore] Redis set error:', e.message);
     }
   }
   memoryRooms.set(room, data);
@@ -128,7 +129,7 @@ async function deleteRoomData(room) {
       await redis.del(`room:${room}`);
       return;
     } catch (e) {
-      console.warn('[RoomStore] Redis del error:', e.message);
+      console.error('[RoomStore] Redis del error:', e.message);
     }
   }
   memoryRooms.delete(room);
