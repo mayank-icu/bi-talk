@@ -421,13 +421,11 @@
   async function drainPendingCandidates() {
     if (!pc || !pc.remoteDescription) return;
     if (pendingCandidates.length > 0) {
-      console.log(`[WebRTC] Draining ${pendingCandidates.length} queued ICE candidate(s)...`);
       for (const cand of pendingCandidates) {
         try {
           await pc.addIceCandidate(new RTCIceCandidate(cand));
-          console.log('[WebRTC] Successfully added queued ICE candidate');
         } catch (e) {
-          console.warn('[WebRTC] Error adding queued ICE candidate:', e.message);
+          console.warn('[WebRTC] Error adding candidate:', e.message);
         }
       }
       pendingCandidates = [];
@@ -436,61 +434,47 @@
 
   async function handleSignalMessage(msg) {
     if (!msg || !msg.type) return;
-    console.log('[Signal Client] Received message:', msg.type, msg);
 
     switch (msg.type) {
       case 'role':
-        console.log(`[Signal Client] Assigned role: ${msg.role}`);
         role = msg.role;
         createPC();
         break;
       case 'ready':
-        console.log(`[Signal Client] Signaling ready received (role: ${role})`);
         if (role === 'offerer') {
-          console.log('[WebRTC] Creating SDP offer...');
           const offer = await pc.createOffer();
           await pc.setLocalDescription(offer);
-          console.log('[WebRTC] Local offer set. Sending offer to partner...');
           wsSend({ type: 'offer', sdp: pc.localDescription });
         }
         break;
       case 'offer':
-        console.log('[WebRTC] SDP offer received from offerer.');
         if (!pc) createPC();
         await pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
-        console.log('[WebRTC] Remote description set. Creating SDP answer...');
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
-        console.log('[WebRTC] Local answer set. Sending answer to offerer...');
         wsSend({ type: 'answer', sdp: pc.localDescription });
         await drainPendingCandidates();
         break;
       case 'answer':
-        console.log('[WebRTC] SDP answer received from answerer.');
         if (role === 'offerer') {
           await pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
-          console.log('[WebRTC] Remote answer description set successfully.');
           await drainPendingCandidates();
         }
         break;
       case 'ice-candidate':
         if (msg.candidate) {
           if (pc && pc.remoteDescription && pc.remoteDescription.type) {
-            console.log('[WebRTC] Remote description present — adding ICE candidate immediately');
             try {
               await pc.addIceCandidate(new RTCIceCandidate(msg.candidate));
-              console.log('[WebRTC] ICE candidate added successfully');
             } catch (e) {
-              console.warn('[WebRTC] ICE add candidate error:', e.message);
+              console.warn('[WebRTC] ICE candidate error:', e.message);
             }
           } else {
-            console.log('[WebRTC] Remote description NOT set yet — queuing ICE candidate');
             pendingCandidates.push(msg.candidate);
           }
         }
         break;
       case 'peer-disconnected':
-        console.log('[Signal Client] Partner disconnected notification received');
         setStatus('failed', 'partnerLeft');
         stopTimer();
         Conversation.systemMsg(t('partnerLeft'));
@@ -503,7 +487,6 @@
   async function startHttpSignaling() {
     if (useHttpSignal) return;
     useHttpSignal = true;
-    console.log(`[HTTP Signal] Initializing HTTP signaling for room: ${room}`);
 
     try {
       const res = await fetch('/api/signal/join', {
@@ -513,13 +496,11 @@
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        console.error('[HTTP Signal] Join failed:', res.status, err);
         showError(err.error || 'Failed to join room over HTTP signaling');
         return;
       }
       const data = await res.json();
       httpPeerId = data.peerId;
-      console.log(`[HTTP Signal] Joined successfully. PeerId: ${httpPeerId}, Role: ${data.role}, Storage: ${data.storage || 'unknown'}`);
 
       pollInterval = setInterval(async () => {
         if (!httpPeerId) return;
@@ -528,7 +509,6 @@
           if (pRes.ok) {
             const pData = await pRes.json();
             if (Array.isArray(pData.messages) && pData.messages.length > 0) {
-              console.log(`[HTTP Signal] Polled ${pData.messages.length} message(s):`, pData.messages.map(m => m.type));
               for (const m of pData.messages) {
                 await handleSignalMessage(m);
               }

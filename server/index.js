@@ -118,8 +118,6 @@ async function saveRoomData(room, data) {
     } catch (e) {
       if (e.message && e.message.includes('NOPERM')) {
         console.error('❌ [RoomStore] UPSTASH PERMISSION ERROR: Your UPSTASH_REDIS_REST_TOKEN is Read-Only! Please replace it with the Read-Write token from Upstash console.');
-      } else {
-        console.error('[RoomStore] Redis set error:', e.message);
       }
     }
   }
@@ -150,10 +148,7 @@ apiRouter.post('/signal/join', async (req, res) => {
     }
 
     const peerKeys = Object.keys(roomData.peers);
-    console.log(`[Signal Join] Room: ${room}, Current peers count: ${peerKeys.length}`);
-
     if (peerKeys.length >= 2) {
-      console.warn(`[Signal Join] Room ${room} is full (max 2 users)`);
       return res.status(400).json({ error: 'Room is full (max 2 users)' });
     }
 
@@ -169,16 +164,13 @@ apiRouter.post('/signal/join', async (req, res) => {
 
     const newPeerKeys = Object.keys(roomData.peers);
     if (newPeerKeys.length === 2) {
-      console.log(`[Signal Join] Room: ${room} now has 2 peers — queuing 'ready' signal for both`);
       for (const pId of newPeerKeys) {
         roomData.peers[pId].messages.push({ type: 'ready' });
       }
     }
 
     await saveRoomData(room, roomData);
-    console.log(`[Signal Join] Assigned peerId: ${peerId}, role: ${role}, ready: ${newPeerKeys.length === 2}`);
-
-    return res.json({ peerId, role, ready: newPeerKeys.length === 2, storage: getRedis() ? 'redis' : 'memory' });
+    return res.json({ peerId, role, ready: newPeerKeys.length === 2 });
   } catch (err) {
     console.error('[Signal Join Error]', err);
     return res.status(500).json({ error: 'Internal error during room join' });
@@ -192,11 +184,9 @@ apiRouter.post('/signal/send', async (req, res) => {
 
     const roomData = await getRoomData(room);
     if (!roomData || !roomData.peers) {
-      console.warn(`[Signal Send] Room ${room} not found in store for peer ${peerId}`);
       return res.status(404).json({ error: 'Room not found' });
     }
 
-    console.log(`[Signal Send] Room: ${room}, From: ${peerId}, Message Type: ${message.type}`);
     for (const pId in roomData.peers) {
       if (pId !== peerId) {
         roomData.peers[pId].messages.push(message);
@@ -204,7 +194,6 @@ apiRouter.post('/signal/send', async (req, res) => {
     }
 
     await saveRoomData(room, roomData);
-
     return res.json({ success: true });
   } catch (err) {
     console.error('[Signal Send Error]', err);
@@ -228,7 +217,6 @@ apiRouter.get('/signal/poll', async (req, res) => {
     peer.messages = [];
 
     if (msgs.length > 0) {
-      console.log(`[Signal Poll] Room: ${room}, Peer: ${peerId} pulled ${msgs.length} msg(s): ${msgs.map(m => m.type).join(', ')}`);
       await saveRoomData(room, roomData);
     }
 
