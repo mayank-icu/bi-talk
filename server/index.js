@@ -59,84 +59,170 @@ app.get('/api/ice-servers', (req, res) => {
 });
 
 // ─── HTTP Signaling for Serverless / Netlify Fallback ─────────────────────────
-const httpRooms = new Map();
+const { getStore } = require('@netlify/blobs');
 
-app.post('/api/signal/join', (req, res) => {
-  const { room } = req.body || {};
-  if (!room) return res.status(400).json({ error: 'No room code provided' });
+const memoryRooms = new Map();
 
-  if (!httpRooms.has(room)) {
-    httpRooms.set(room, { peers: new Map() });
+function getBlobStore() {
+  try {
+    if (process.env.NETLIFY || process.env.NETLIFY_BLOBS_CONTEXT || process.env.SITE_ID) {
+      return getStore('rooms');
+    }
+  } catch (err) {
+    console.warn('[RoomStore] Netlify Blobs not initialized, using memory store fallback:', err.message);
   }
+  return null;
+}
 
-  const roomData = httpRooms.get(room);
-  if (roomData.peers.size >= 2) {
-    return res.status(400).json({ error: 'Room is full (max 2 users)' });
-  }
-
-  const peerId = 'peer_' + Math.random().toString(36).substring(2, 9);
-  const isOfferer = roomData.peers.size === 0;
-  const role = isOfferer ? 'offerer' : 'answerer';
-
-  roomData.peers.set(peerId, {
-    role,
-    lastPoll: Date.now(),
-    messages: [{ type: 'role', role }],
-  });
-
-  if (roomData.peers.size === 2) {
-    for (const p of roomData.peers.values()) {
-      p.messages.push({ type: 'ready' });
+async function getRoomData(room) {
+  const store = getBlobStore();
+  if (store) {
+    try {
+      const data = await store.get(room, { type: 'json' });
+      return data || null;
+    } catch (e) {
+      console.warn('[RoomStore] Blob get error:', e.message);
     }
   }
+  return memoryRooms.get(room) || null;
+}
 
-  return res.json({ peerId, role, ready: roomData.peers.size === 2 });
-});
-
-app.post('/api/signal/send', (req, res) => {
-  const { room, peerId, message } = req.body || {};
-  if (!room || !peerId || !message) return res.status(400).json({ error: 'Missing parameters' });
-
-  const roomData = httpRooms.get(room);
-  if (!roomData) return res.status(404).json({ error: 'Room not found' });
-
-  for (const [pId, peer] of roomData.peers.entries()) {
-    if (pId !== peerId) {
-      peer.messages.push(message);
+async function saveRoomData(room, data) {
+  const store = getBlobStore();
+  if (store) {
+    try {
+      await store.setJSON(room, data);
+      return;
+    } catch (e) {
+      console.warn('[RoomStore] Blob set error:', e.message);
     }
   }
+  memoryRooms.set(room, data);
+}
 
-  return res.json({ success: true });
-});
-
-app.get('/api/signal/poll', (req, res) => {
-  const { room, peerId } = req.query || {};
-  if (!room || !peerId) return res.status(400).json({ error: 'Missing room or peerId' });
-
-  const roomData = httpRooms.get(room);
-  if (!roomData || !roomData.peers.has(peerId)) {
-    return res.json({ messages: [] });
-  }
-
-  const peer = roomData.peers.get(peerId);
-  peer.lastPoll = Date.now();
-  const msgs = peer.messages;
-  peer.messages = [];
-
-  return res.json({ messages: msgs });
-});
-
-app.post('/api/signal/leave', (req, res) => {
-  const { room, peerId } = req.body || {};
-  if (room && peerId && httpRooms.has(room)) {
-    const roomData = httpRooms.get(room);
-    roomData.peers.delete(peerId);
-    for (const peer of roomData.peers.values()) {
-      peer.messages.push({ type: 'peer-disconnected' });
+async function deleteRoomData(room) {
+  const store = getBlobStore();
+  if (store) {
+    try {
+      await store.delete(room);
+      return;
+    } catch (e) {
+      console.warn('[RoomStore] Blob delete error:', e.message);
     }
-    if (roomData.peers.size === 0) httpRooms.delete(room);
   }
-  return res.json({ success: true });
+  memoryRooms.delete(room);
+}
+
+app.post('/api/signal/join', async (req, res) => {
+  try {
+    const { room } = req.body || {};
+    if (!room) return res.status(400).json({ error: 'No room code provided' });
+
+    let roomData = await getRoomData(room);
+    if (!roomData || !roomData.peers) {
+      roomData = { peers: {} };
+    }
+
+    const peerKeys = Object.keys(roomData.peers);
+    if (peerKeys.length >= 2) {
+      return res.status(400).json({ error: 'Room is full (max 2 users)' });
+    }
+
+    const peerId = 'peer_' + Math.random().toString(36).substring(2, 9);
+    const isOfferer = peerKeys.length === 0;
+    const role = isOfferer ? 'offerer' : 'answerer';
+
+    roomData.peers[peerId] = {
+      role,
+      lastPoll: Date.now(),
+      messages: [{ type: 'role', role }],
+    };
+
+    const newPeerKeys = Object.keys(roomData.peers);
+    if (newPeerKeys.length === 2) {
+      for (const pId of newPeerKeys) {
+        roomData.peers[pId].messages.push({ type: 'ready' });
+      }
+    }
+
+    await saveRoomData(room, roomData);
+
+    return res.json({ peerId, role, ready: newPeerKeys.length === 2 });
+  } catch (err) {
+    console.error('[Signal Join Error]', err);
+    return res.status(500).json({ error: 'Internal error during room join' });
+  }
+});
+
+app.post('/api/signal/send', async (req, res) => {
+  try {
+    const { room, peerId, message } = req.body || {};
+    if (!room || !peerId || !message) return res.status(400).json({ error: 'Missing parameters' });
+
+    const roomData = await getRoomData(room);
+    if (!roomData || !roomData.peers) return res.status(404).json({ error: 'Room not found' });
+
+    for (const pId in roomData.peers) {
+      if (pId !== peerId) {
+        roomData.peers[pId].messages.push(message);
+      }
+    }
+
+    await saveRoomData(room, roomData);
+
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('[Signal Send Error]', err);
+    return res.status(500).json({ error: 'Internal error during signal send' });
+  }
+});
+
+app.get('/api/signal/poll', async (req, res) => {
+  try {
+    const { room, peerId } = req.query || {};
+    if (!room || !peerId) return res.status(400).json({ error: 'Missing room or peerId' });
+
+    const roomData = await getRoomData(room);
+    if (!roomData || !roomData.peers || !roomData.peers[peerId]) {
+      return res.json({ messages: [] });
+    }
+
+    const peer = roomData.peers[peerId];
+    peer.lastPoll = Date.now();
+    const msgs = peer.messages || [];
+    peer.messages = [];
+
+    await saveRoomData(room, roomData);
+
+    return res.json({ messages: msgs });
+  } catch (err) {
+    console.error('[Signal Poll Error]', err);
+    return res.status(500).json({ error: 'Internal error during signal poll' });
+  }
+});
+
+app.post('/api/signal/leave', async (req, res) => {
+  try {
+    const { room, peerId } = req.body || {};
+    if (room && peerId) {
+      const roomData = await getRoomData(room);
+      if (roomData && roomData.peers && roomData.peers[peerId]) {
+        delete roomData.peers[peerId];
+        const remainingPeerKeys = Object.keys(roomData.peers);
+        if (remainingPeerKeys.length === 0) {
+          await deleteRoomData(room);
+        } else {
+          for (const pId of remainingPeerKeys) {
+            roomData.peers[pId].messages.push({ type: 'peer-disconnected' });
+          }
+          await saveRoomData(room, roomData);
+        }
+      }
+    }
+    return res.json({ success: true });
+  } catch (err) {
+    return res.json({ success: true });
+  }
 });
 
 // ─── Multer (memory storage for audio blobs) ─────────────────────────────────

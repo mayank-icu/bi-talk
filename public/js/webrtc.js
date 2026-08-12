@@ -498,38 +498,44 @@
     }
   }
 
-  try {
-    const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    ws = new WebSocket(`${wsProto}//${location.host}/ws?room=${encodeURIComponent(room)}`);
+  const isNetlify = location.hostname.endsWith('.netlify.app') || location.hostname.endsWith('.netlify.com');
 
-    const wsTimer = setTimeout(() => {
-      if (ws.readyState !== WebSocket.OPEN) {
-        try { ws.close(); } catch {}
-        startHttpSignaling();
-      }
-    }, 2000);
-
-    ws.onopen = () => clearTimeout(wsTimer);
-
-    ws.onmessage = async (event) => {
-      let msg;
-      try { msg = JSON.parse(event.data); } catch { return; }
-      await handleSignalMessage(msg);
-    };
-
-    ws.onerror = () => {
-      clearTimeout(wsTimer);
-      startHttpSignaling();
-    };
-
-    ws.onclose = () => {
-      clearTimeout(wsTimer);
-      if (!useHttpSignal && (!pc || pc.iceConnectionState !== 'connected')) {
-        startHttpSignaling();
-      }
-    };
-  } catch (e) {
+  if (isNetlify) {
     startHttpSignaling();
+  } else {
+    try {
+      const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      ws = new WebSocket(`${wsProto}//${location.host}/ws?room=${encodeURIComponent(room)}`);
+
+      const wsTimer = setTimeout(() => {
+        if (ws.readyState !== WebSocket.OPEN) {
+          try { ws.close(); } catch {}
+          startHttpSignaling();
+        }
+      }, 2000);
+
+      ws.onopen = () => clearTimeout(wsTimer);
+
+      ws.onmessage = async (event) => {
+        let msg;
+        try { msg = JSON.parse(event.data); } catch { return; }
+        await handleSignalMessage(msg);
+      };
+
+      ws.onerror = () => {
+        clearTimeout(wsTimer);
+        startHttpSignaling();
+      };
+
+      ws.onclose = () => {
+        clearTimeout(wsTimer);
+        if (!useHttpSignal && (!pc || pc.iceConnectionState !== 'connected')) {
+          startHttpSignaling();
+        }
+      };
+    } catch (e) {
+      startHttpSignaling();
+    }
   }
 
   // ── Groq pipeline with callbacks ───────────────────────────────────
