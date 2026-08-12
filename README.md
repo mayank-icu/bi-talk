@@ -12,7 +12,7 @@
 - 🎙️ **Integrated Voice Activity Detection (VAD)**: Smart audio buffering that captures speech segments naturally as you speak.
 - 💬 **Live Translated Chat & Reactions**: Type messages with automatic translation or send expressive floating super-reactions.
 - 📝 **Post-Call Summaries & Playback**: View a detailed timeline summary of your call transcript and listen back to the recorded audio.
-- 🚀 **Flexible Deployment**: Supports 24/7 hosting on Google Cloud Platform (Compute Engine Always Free tier) as well as serverless Netlify deployment.
+- 🚀 **Always Free 24/7 Deployment**: Pre-configured for seamless 24/7 hosting on Google Cloud Platform's Always Free VM tier.
 
 ---
 
@@ -64,16 +64,16 @@ Open a second tab or share your local IP to start a test call between two browse
 
 ---
 
-## ☁️ Deployment Guide
+## ☁️ Deployment Guide (Google Cloud Always Free VM)
 
-### Option 1: Google Cloud Platform (Always Free VM - Recommended)
 Google Cloud provides 1 free `e2-micro` Virtual Machine per month in US regions (`us-central1`, `us-east1`, or `us-west1`).
 
-1. Create a VM instance on GCP Compute Engine:
+1. **Create a VM instance on GCP Compute Engine**:
    - **Machine Type**: `e2-micro` (1 GB RAM)
    - **Region**: `us-central1`, `us-east1`, or `us-west1`
    - **Boot Disk**: Standard Persistent Disk (up to 30 GB)
-2. SSH into your VM and deploy:
+
+2. **SSH into your VM and deploy**:
    ```bash
    sudo apt-get update
    curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
@@ -93,30 +93,19 @@ Google Cloud provides 1 free `e2-micro` Virtual Machine per month in US regions 
    pm2 save
    pm2 logs tunnel --lines 20
    ```
-3. Open the secure `https://...trycloudflare.com` URL in your browser for instant HTTPS and microphone permissions!
 
----
-
-### Option 2: Netlify Deployment
-This project is pre-configured with `netlify.toml` and Netlify Functions.
-
-1. Import your repository in [Netlify Dashboard](https://app.netlify.com).
-2. Go to **Site Settings > Environment Variables** and add:
-   - `GROQ_API_KEY`: Your Groq API Key
-   - `TURN_URL` *(Optional)*: Your TURN Server URL
-   - `TURN_USERNAME` *(Optional)*: Your TURN Username
-   - `TURN_CREDENTIAL` *(Optional)*: Your TURN Credential
-3. Click **Deploy Site**.
+3. **Open the secure link**:
+   Open the secure `https://...trycloudflare.com` URL from your PM2 logs in your browser for instant HTTPS, WebSockets, and microphone access!
 
 ---
 
 ## 🛠️ Built With
 
-- **Backend**: Node.js, Express, WebSocket (`ws`), Multer, `serverless-http`
+- **Backend**: Node.js, Express, WebSocket (`ws`), Multer
 - **Frontend**: Vanilla JavaScript (ES6+), HTML5, Custom CSS
 - **Media & Signaling**: WebRTC (`RTCPeerConnection`, `RTCDataChannel`), Web Audio API
 - **AI Models**: Groq Cloud API (`whisper-large-v3-turbo` + `llama-3.3-70b-versatile`)
-- **Deployment**: Google Cloud Platform / Netlify
+- **Deployment**: Google Cloud Platform (Compute Engine `e2-micro`)
 
 ---
 
