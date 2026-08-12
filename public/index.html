@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Thread — Two languages, one conversation</title>
+  <meta name="description" content="Real-time bilingual video calls with live translated captions for English and Chinese speakers."/>
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600&family=Literata:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="/css/style.css"/>
+</head>
+<body class="home-body">
+
+  <main class="home-main">
+
+    <!-- Logo Globe Icon -->
+    <span class="material-symbols-outlined home-logo-icon">language</span>
+
+    <h1 class="home-title">Thread</h1>
+    <p class="home-subtitle" id="ui-subtitle">Two languages, one conversation.</p>
+
+    <!-- Language Selector -->
+    <div class="lang-toggle-wrap">
+      <button type="button" id="btn-lang-en" class="lang-btn active">English</button>
+      <button type="button" id="btn-lang-zh" class="lang-btn">中文</button>
+    </div>
+
+    <!-- Card -->
+    <div class="home-card">
+      <!-- Tab Header -->
+      <div class="tab-header">
+        <button type="button" id="tab-start-btn" class="tab-btn active" id="ui-tab-start">Start a call</button>
+        <button type="button" id="tab-join-btn"  class="tab-btn" id="ui-tab-join">Join a call</button>
+      </div>
+
+      <!-- START A CALL -->
+      <div class="card-content" id="content-start">
+        <div class="card-section-head">
+          <span class="card-heading" id="ui-start-heading">Start a call</span>
+          <span class="material-symbols-outlined card-icon">video_call</span>
+        </div>
+        <p class="card-desc" id="ui-start-desc">Initiate a new bilingual session. Your preferred language settings will be applied automatically.</p>
+
+        <div>
+          <label class="form-label" id="ui-label-name">Your name</label>
+          <input type="text" id="display-name-start" class="form-input" placeholder="e.g. Sarah" maxlength="24" autocomplete="name"/>
+        </div>
+
+        <div>
+          <label class="form-label" id="ui-label-avatar-start">Profile Picture (Optional)</label>
+          <div class="avatar-upload-wrap">
+            <div class="avatar-preview-box" id="avatar-preview-box-start" onclick="document.getElementById('avatar-input-start').click()">
+              <span class="material-symbols-outlined" style="color:var(--text-dim);font-size:24px;">add_a_photo</span>
+            </div>
+            <label for="avatar-input-start" class="avatar-upload-btn">
+              <span class="material-symbols-outlined" style="font-size:18px;">upload</span>
+              <span id="ui-upload-start-text">Choose photo</span>
+            </label>
+            <input type="file" id="avatar-input-start" accept="image/*" style="display:none;"/>
+          </div>
+        </div>
+
+        <button class="btn-coral" id="create-room-btn">
+          <span class="material-symbols-outlined">add</span>
+          <span id="ui-create-btn-text">Create Room</span>
+        </button>
+      </div>
+
+      <!-- JOIN A CALL -->
+      <div class="card-content hidden" id="content-join">
+        <div class="card-section-head">
+          <span class="card-heading" id="ui-join-heading">Join a call</span>
+          <span class="material-symbols-outlined card-icon">meeting_room</span>
+        </div>
+        <p class="card-desc" id="ui-join-desc">Enter the room code shared by your partner to connect.</p>
+
+        <div>
+          <label class="form-label" id="ui-label-name-join">Your name</label>
+          <input type="text" id="display-name-join" class="form-input" placeholder="e.g. Wei" maxlength="24" autocomplete="name"/>
+        </div>
+
+        <div>
+          <label class="form-label" id="ui-label-avatar-join">Profile Picture (Optional)</label>
+          <div class="avatar-upload-wrap">
+            <div class="avatar-preview-box" id="avatar-preview-box-join" onclick="document.getElementById('avatar-input-join').click()">
+              <span class="material-symbols-outlined" style="color:var(--text-dim);font-size:24px;">add_a_photo</span>
+            </div>
+            <label for="avatar-input-join" class="avatar-upload-btn">
+              <span class="material-symbols-outlined" style="font-size:18px;">upload</span>
+              <span id="ui-upload-join-text">Choose photo</span>
+            </label>
+            <input type="file" id="avatar-input-join" accept="image/*" style="display:none;"/>
+          </div>
+        </div>
+
+        <div>
+          <label class="form-label" id="ui-label-code">Room code</label>
+          <input type="text" id="room-code-input" class="form-input code-input" placeholder="ENTER CODE" maxlength="12" autocomplete="off" autocapitalize="characters" spellcheck="false"/>
+        </div>
+
+        <button class="btn-coral" id="join-room-btn">
+          <span id="ui-join-btn-text">Join Room</span>
+          <span class="material-symbols-outlined">arrow_forward</span>
+        </button>
+      </div>
+    </div>
+
+  </main>
+
+  <footer class="home-footer" id="ui-footer">THREAD VIDEO COMMUNICATIONS © 2026</footer>
+
+  <script src="/js/room.js"></script>
+</body>
+</html>

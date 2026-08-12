@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Thread — Call Summary</title>
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600&family=Literata:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="/css/style.css"/>
+</head>
+<body class="summary-body">
+
+  <main class="summary-main">
+    
+    <!-- Header Banner -->
+    <header class="summary-header">
+      <div class="summary-logo-row">
+        <span class="material-symbols-outlined logo-icon">assessment</span>
+        <h1 class="summary-title" id="ui-summary-title">Call Summary</h1>
+      </div>
+      <p class="summary-subtitle" id="ui-summary-subtitle">Your call has ended. Review and download your full transcript and call recording below.</p>
+    </header>
+
+    <!-- Key Metrics Pills -->
+    <div class="metrics-grid" id="metrics-grid">
+      <div class="metric-card">
+        <span class="material-symbols-outlined metric-icon">timer</span>
+        <div class="metric-info">
+          <span class="metric-label" id="ui-label-duration">Duration</span>
+          <span class="metric-value" id="summary-duration">00:00</span>
+        </div>
+      </div>
+
+      <div class="metric-card">
+        <span class="material-symbols-outlined metric-icon">group</span>
+        <div class="metric-info">
+          <span class="metric-label" id="ui-label-participants">Participants</span>
+          <span class="metric-value" id="summary-participants">You & Partner</span>
+        </div>
+      </div>
+
+      <div class="metric-card">
+        <span class="material-symbols-outlined metric-icon">tag</span>
+        <div class="metric-info">
+          <span class="metric-label" id="ui-label-room">Room Code</span>
+          <span class="metric-value" id="summary-room">ROOM</span>
+        </div>
+      </div>
+
+      <div class="metric-card">
+        <span class="material-symbols-outlined metric-icon">chat</span>
+        <div class="metric-info">
+          <span class="metric-label" id="ui-label-messages">Messages</span>
+          <span class="metric-value" id="summary-msg-count">0</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 1: Full Call Audio Recording -->
+    <section class="summary-section-card">
+      <div class="section-card-header">
+        <div class="section-card-title-group">
+          <span class="material-symbols-outlined section-icon">graphic_eq</span>
+          <div>
+            <h2 class="section-card-title" id="ui-audio-heading">Full Call Audio Recording</h2>
+            <p class="section-card-desc" id="ui-audio-desc">Complete combined audio of both participants recorded during the call.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="audio-player-container" id="audio-container">
+        <div class="audio-player-box">
+          <audio id="summary-audio-player" controls preload="metadata" style="width: 100%; border-radius: 8px;"></audio>
+        </div>
+        <div class="audio-no-recording hidden" id="audio-no-recording">
+          <span class="material-symbols-outlined">mic_off</span>
+          <span>No audio recording available for this session.</span>
+        </div>
+      </div>
+
+      <div class="section-card-actions">
+        <button class="btn-coral" id="btn-download-audio">
+          <span class="material-symbols-outlined">download</span>
+          <span id="ui-btn-download-audio">Download Call Audio (.webm)</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- Section 2: Conversation Transcript & Chat Logs -->
+    <section class="summary-section-card">
+      <div class="section-card-header">
+        <div class="section-card-title-group">
+          <span class="material-symbols-outlined section-icon">forum</span>
+          <div>
+            <h2 class="section-card-title" id="ui-chat-heading">Conversation & Chat Transcript</h2>
+            <p class="section-card-desc" id="ui-chat-desc">Full log of all spoken speech transcriptions and typed messages with translations.</p>
+          </div>
+        </div>
+
+        <div class="transcript-download-btns">
+          <button class="btn-secondary" id="btn-download-txt" title="Download formatted text transcript">
+            <span class="material-symbols-outlined">description</span>
+            <span>Download .txt</span>
+          </button>
+          <button class="btn-secondary" id="btn-download-json" title="Download structured JSON transcript">
+            <span class="material-symbols-outlined">code</span>
+            <span>Download .json</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Scrollable transcript log container -->
+      <div class="transcript-container" id="transcript-container">
+        <div class="transcript-empty" id="transcript-empty">
+          <span class="material-symbols-outlined">chat_bubble_outline</span>
+          <span>No conversation messages recorded in this call session.</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Bottom Action Footer -->
+    <footer class="summary-footer">
+      <button class="btn-home" id="btn-home">
+        <span class="material-symbols-outlined">home</span>
+        <span id="ui-btn-home">Return to Home Screen</span>
+      </button>
+    </footer>
+
+  </main>
+
+  <script src="/js/storage.js"></script>
+  <script src="/js/summary.js"></script>
+</body>
+</html>

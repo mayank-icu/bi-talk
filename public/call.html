@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Thread — In Call</title>
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600&family=Literata:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="/css/style.css"/>
+</head>
+<body class="call-page-body">
+
+  <div class="call-container">
+
+    <!-- ── Top Avatar Bar ──────────────────────────────────────────── -->
+    <header class="call-top-bar">
+
+      <!-- Local (Me) avatar chip — left -->
+      <div class="avatar-chip">
+        <div class="avatar-chip-circle-wrap">
+          <div class="avatar-chip-circle" id="local-avatar-circle">
+            <span id="local-avatar-initial">Y</span>
+            <div class="avatar-muted-overlay" id="local-muted-overlay">
+              <span class="material-symbols-outlined">mic_off</span>
+            </div>
+          </div>
+          <div class="avatar-mute-dot" id="local-mute-dot">
+            <span class="material-symbols-outlined">mic_off</span>
+          </div>
+        </div>
+        <div class="avatar-chip-info">
+          <div class="avatar-chip-name" id="local-speaker-name">You</div>
+          <div class="avatar-chip-lang" id="local-lang-tag">EN</div>
+        </div>
+      </div>
+
+      <!-- Center: Timer + Connection Status -->
+      <div class="call-center">
+        <span class="call-timer" id="call-timer">00:00</span>
+        <div class="status-dot-row">
+          <div class="conn-dot connecting" id="conn-dot"></div>
+          <span id="conn-label">Connecting…</span>
+        </div>
+      </div>
+
+      <!-- Remote (Partner) avatar chip — right -->
+      <div class="avatar-chip" style="flex-direction:row-reverse; text-align:right;">
+        <div class="avatar-chip-circle-wrap">
+          <div class="avatar-chip-circle" id="remote-avatar-circle">
+            <span id="remote-avatar-initial">P</span>
+            <div class="avatar-muted-overlay" id="remote-muted-overlay">
+              <span class="material-symbols-outlined">mic_off</span>
+            </div>
+          </div>
+          <div class="avatar-mute-dot" id="remote-mute-dot">
+            <span class="material-symbols-outlined">mic_off</span>
+          </div>
+        </div>
+        <div class="avatar-chip-info" style="text-align:right;">
+          <div class="avatar-chip-name" id="remote-speaker-name">Partner</div>
+          <div class="avatar-chip-lang" id="remote-lang-tag">ZH</div>
+        </div>
+      </div>
+
+    </header>
+
+    <!-- Hidden WebRTC media elements -->
+    <video id="remote-video" autoplay playsinline class="hidden-media"></video>
+    <video id="local-video"  autoplay playsinline muted class="hidden-media"></video>
+
+    <!-- ── Conversation Area ───────────────────────────────────────── -->
+    <main class="conversation-area" id="conversation-area">
+      <!-- Waiting overlay injected here by JS as a .sys-msg / .waiting-overlay -->
+    </main>
+
+    <!-- ── Error Banner ────────────────────────────────────────────── -->
+    <div id="error-banner">
+      <span class="material-symbols-outlined">warning</span>
+      <span id="error-message">An error occurred</span>
+    </div>
+
+    <!-- ── Join Toast ──────────────────────────────────────────────── -->
+    <div class="join-toast" id="join-toast">
+      <span class="material-symbols-outlined">person_add</span>
+      <span id="join-toast-text">Partner has joined the call!</span>
+    </div>
+
+    <!-- ── Bottom Footer ───────────────────────────────────────────── -->
+    <footer class="call-footer">
+
+      <!-- Controls row -->
+      <div class="controls-row">
+        <button class="ctrl-btn" id="btn-mic" title="Toggle mic">
+          <span class="material-symbols-outlined" id="icon-mic">mic</span>
+        </button>
+
+        <button class="ctrl-btn active" id="btn-captions" title="Toggle captions">
+          <span class="material-symbols-outlined">closed_caption</span>
+        </button>
+
+        <button class="ctrl-btn" id="btn-reaction" title="Send reaction">
+          <span class="material-symbols-outlined">add_reaction</span>
+        </button>
+
+        <button class="ctrl-btn-sm" id="btn-lang-toggle" title="Switch spoken language">
+          <span class="material-symbols-outlined">language</span>
+          <span id="lang-toggle-text">EN</span>
+        </button>
+
+        <button class="end-call-btn" id="btn-hangup">
+          <span class="material-symbols-outlined">call_end</span>
+          <span id="ui-end-call-text">End</span>
+        </button>
+      </div>
+
+      <!-- Chat input row -->
+      <form class="chat-input-row" id="chat-form">
+        <input
+          type="text"
+          id="chat-input"
+          class="chat-input"
+          placeholder="Type a message — auto-translated…"
+          autocomplete="off"
+        />
+        <button type="submit" class="chat-send-btn" id="chat-send-btn" title="Send">
+          <span class="material-symbols-outlined">send</span>
+        </button>
+      </form>
+
+    </footer>
+
+  </div><!-- /.call-container -->
+
+  <!-- ── End Call Confirmation Modal ─────────────────────────────── -->
+  <div class="modal-overlay" id="end-call-modal">
+    <div class="modal-card">
+      <div class="modal-icon-wrap">
+        <span class="material-symbols-outlined">call_end</span>
+      </div>
+      <h3 class="modal-title">End this call?</h3>
+      <p class="modal-desc">You'll disconnect from your partner and view your call summary, where you can download your chat logs and full call audio.</p>
+      <div class="modal-actions">
+        <button class="modal-btn-cancel" id="modal-cancel-btn">Cancel</button>
+        <button class="modal-btn-end"    id="modal-end-btn">End Call</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/storage.js"></script>
+  <script src="/js/audio-mixer.js"></script>
+  <script src="/js/vad.js"></script>
+  <script src="/js/recorder.js"></script>
+  <script src="/js/conversation.js"></script>
+  <script src="/js/groq.js"></script>
+  <script src="/js/reactions.js"></script>
+  <script src="/js/webrtc.js"></script>
+</body>
+</html>
