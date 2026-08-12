@@ -392,7 +392,7 @@ wss.on('connection', (ws, req) => {
     }
   });
 
-  ws.onclose = () => {
+  ws.on('close', () => {
     console.log(`[Room ${room}] A peer disconnected`);
     const idx = peers.indexOf(ws);
     if (idx !== -1) peers.splice(idx, 1);
@@ -406,11 +406,11 @@ wss.on('connection', (ws, req) => {
       rooms.delete(room);
       console.log(`[Room ${room}] Room closed`);
     }
-  };
+  });
 
-  ws.onerror = (err) => {
+  ws.on('error', (err) => {
     console.error(`[Room ${room}] WebSocket error:`, err.message);
-  };
+  });
 });
 
 // ─── Start ────────────────────────────────────────────────────────────────────
