@@ -335,10 +335,11 @@ Do NOT include any commentary, explanations, quotes, or original text. Output ON
   }
 });
 
-// Mount router on all path prefixes to support Express & Netlify Functions
-app.use('/api', apiRouter);
-app.use('/.netlify/functions/api', apiRouter);
-app.use('/', apiRouter);
+// Local Express: routes are at /api/* (browser calls /api/signal/send)
+// Netlify Functions: Netlify redirect strips /api prefix, function receives /signal/send
+// So we mount on BOTH so it works in both environments.
+app.use('/api', apiRouter);  // local dev & any direct /api/* calls
+app.use('/', apiRouter);     // Netlify: receives path without /api prefix
 
 // ─── WebSocket Signaling ──────────────────────────────────────────────────────
 // rooms: Map<roomCode, [ws1, ws2]>
