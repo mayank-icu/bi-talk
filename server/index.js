@@ -8,6 +8,7 @@ const multer = require('multer');
 const fetch = require('node-fetch');
 const path = require('path');
 const FormData = require('form-data');
+const { getStore } = require('@netlify/blobs');
 
 const app = express();
 const server = http.createServer(app);
@@ -28,13 +29,15 @@ if (!GROQ_API_KEY) {
   process.exit(1);
 }
 
-// ─── Static files ────────────────────────────────────────────────────────────
+// ─── Static files & middleware ────────────────────────────────────────────────
 app.use(express.static(path.join(__dirname, '..', 'public')));
 app.use(express.json());
 
-// ─── GET /api/ice-servers ─────────────────────────────────────────────────────
-// Exposes STUN/TURN server configuration read from process.env dynamically
-app.get('/api/ice-servers', (req, res) => {
+// Create API Router for flexible path mounting (works on local Express & Netlify Functions)
+const apiRouter = express.Router();
+
+// ─── GET /ice-servers ─────────────────────────────────────────────────────────
+apiRouter.get('/ice-servers', (req, res) => {
   const iceServers = [
     { urls: 'stun:stun.l.google.com:19302' },
   ];
@@ -59,8 +62,6 @@ app.get('/api/ice-servers', (req, res) => {
 });
 
 // ─── HTTP Signaling for Serverless / Netlify Fallback ─────────────────────────
-const { getStore } = require('@netlify/blobs');
-
 const memoryRooms = new Map();
 
 function getBlobStore() {
@@ -113,7 +114,7 @@ async function deleteRoomData(room) {
   memoryRooms.delete(room);
 }
 
-app.post('/api/signal/join', async (req, res) => {
+apiRouter.post('/signal/join', async (req, res) => {
   try {
     const { room } = req.body || {};
     if (!room) return res.status(400).json({ error: 'No room code provided' });
@@ -154,7 +155,7 @@ app.post('/api/signal/join', async (req, res) => {
   }
 });
 
-app.post('/api/signal/send', async (req, res) => {
+apiRouter.post('/signal/send', async (req, res) => {
   try {
     const { room, peerId, message } = req.body || {};
     if (!room || !peerId || !message) return res.status(400).json({ error: 'Missing parameters' });
@@ -177,7 +178,7 @@ app.post('/api/signal/send', async (req, res) => {
   }
 });
 
-app.get('/api/signal/poll', async (req, res) => {
+apiRouter.get('/signal/poll', async (req, res) => {
   try {
     const { room, peerId } = req.query || {};
     if (!room || !peerId) return res.status(400).json({ error: 'Missing room or peerId' });
@@ -201,7 +202,7 @@ app.get('/api/signal/poll', async (req, res) => {
   }
 });
 
-app.post('/api/signal/leave', async (req, res) => {
+apiRouter.post('/signal/leave', async (req, res) => {
   try {
     const { room, peerId } = req.body || {};
     if (room && peerId) {
@@ -231,86 +232,8 @@ const upload = multer({
   limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB max
 });
 
-// ─── WebSocket Signaling ──────────────────────────────────────────────────────
-// rooms: Map<roomCode, [ws1, ws2]>
-const rooms = new Map();
-
-wss.on('connection', (ws, req) => {
-  const url = new URL(req.url, `http://localhost`);
-  const room = url.searchParams.get('room');
-
-  if (!room) {
-    ws.close(4000, 'No room code provided');
-    return;
-  }
-
-  if (!rooms.has(room)) {
-    rooms.set(room, []);
-  }
-
-  const peers = rooms.get(room);
-
-  if (peers.length >= 2) {
-    ws.send(JSON.stringify({ type: 'error', message: 'Room is full (max 2 users)' }));
-    ws.close(4001, 'Room full');
-    return;
-  }
-
-  peers.push(ws);
-  const isOfferer = peers.length === 1;
-
-  console.log(`[Room ${room}] Peer ${isOfferer ? '1 (offerer)' : '2 (answerer)'} connected`);
-
-  // Tell this peer its role
-  ws.send(JSON.stringify({ type: 'role', role: isOfferer ? 'offerer' : 'answerer' }));
-
-  // If both peers are present, tell both to start
-  if (peers.length === 2) {
-    peers.forEach(peer => peer.send(JSON.stringify({ type: 'ready' })));
-    console.log(`[Room ${room}] Both peers connected — signaling ready`);
-  }
-
-  ws.on('message', (data) => {
-    let msg;
-    try {
-      msg = JSON.parse(data);
-    } catch {
-      return;
-    }
-
-    // Forward offer/answer/ice to the OTHER peer in the room
-    const other = peers.find(p => p !== ws && p.readyState === WebSocket.OPEN);
-    if (other) {
-      other.send(JSON.stringify(msg));
-    }
-  });
-
-  ws.on('close', () => {
-    console.log(`[Room ${room}] A peer disconnected`);
-    const idx = peers.indexOf(ws);
-    if (idx !== -1) peers.splice(idx, 1);
-
-    // Notify remaining peer
-    const remaining = peers.find(p => p.readyState === WebSocket.OPEN);
-    if (remaining) {
-      remaining.send(JSON.stringify({ type: 'peer-disconnected' }));
-    }
-
-    if (peers.length === 0) {
-      rooms.delete(room);
-      console.log(`[Room ${room}] Room closed`);
-    }
-  });
-
-  ws.on('error', (err) => {
-    console.error(`[Room ${room}] WebSocket error:`, err.message);
-  });
-});
-
-// ─── POST /api/transcribe ─────────────────────────────────────────────────────
-// Receives: multipart/form-data with `audio` file + `language` field
-// Returns: { text: string }
-app.post('/api/transcribe', upload.single('audio'), async (req, res) => {
+// ─── POST /transcribe ─────────────────────────────────────────────────────────
+apiRouter.post('/transcribe', upload.single('audio'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No audio file provided' });
@@ -354,12 +277,10 @@ app.post('/api/transcribe', upload.single('audio'), async (req, res) => {
   }
 });
 
-// ─── POST /api/translate ──────────────────────────────────────────────────────
-// Receives: { text: string, from: 'en'|'zh', to: 'en'|'zh' }
-// Returns: { translation: string }
-app.post('/api/translate', async (req, res) => {
+// ─── POST /translate ──────────────────────────────────────────────────────────
+apiRouter.post('/translate', async (req, res) => {
   try {
-    const { text, from, to } = req.body;
+    const { text, from, to } = req.body || {};
 
     if (!text || !from || !to) {
       return res.status(400).json({ error: 'Missing text, from, or to fields' });
@@ -412,6 +333,83 @@ Do NOT include any commentary, explanations, quotes, or original text. Output ON
     console.error('[Translate] Unexpected error:', err);
     return res.status(500).json({ error: 'Internal server error during translation' });
   }
+});
+
+// Mount router on all path prefixes to support Express & Netlify Functions
+app.use('/api', apiRouter);
+app.use('/.netlify/functions/api', apiRouter);
+app.use('/', apiRouter);
+
+// ─── WebSocket Signaling ──────────────────────────────────────────────────────
+// rooms: Map<roomCode, [ws1, ws2]>
+const rooms = new Map();
+
+wss.on('connection', (ws, req) => {
+  const url = new URL(req.url, `http://localhost`);
+  const room = url.searchParams.get('room');
+
+  if (!room) {
+    ws.close(4000, 'No room code provided');
+    return;
+  }
+
+  if (!rooms.has(room)) {
+    rooms.set(room, []);
+  }
+
+  const peers = rooms.get(room);
+
+  if (peers.length >= 2) {
+    ws.send(JSON.stringify({ type: 'error', message: 'Room is full (max 2 users)' }));
+    ws.close(4001, 'Room full');
+    return;
+  }
+
+  peers.push(ws);
+  const isOfferer = peers.length === 1;
+
+  console.log(`[Room ${room}] Peer ${isOfferer ? '1 (offerer)' : '2 (answerer)'} connected`);
+
+  ws.send(JSON.stringify({ type: 'role', role: isOfferer ? 'offerer' : 'answerer' }));
+
+  if (peers.length === 2) {
+    peers.forEach(peer => peer.send(JSON.stringify({ type: 'ready' })));
+    console.log(`[Room ${room}] Both peers connected — signaling ready`);
+  }
+
+  ws.on('message', (data) => {
+    let msg;
+    try {
+      msg = JSON.parse(data);
+    } catch {
+      return;
+    }
+
+    const other = peers.find(p => p !== ws && p.readyState === WebSocket.OPEN);
+    if (other) {
+      other.send(JSON.stringify(msg));
+    }
+  });
+
+  ws.onclose = () => {
+    console.log(`[Room ${room}] A peer disconnected`);
+    const idx = peers.indexOf(ws);
+    if (idx !== -1) peers.splice(idx, 1);
+
+    const remaining = peers.find(p => p.readyState === WebSocket.OPEN);
+    if (remaining) {
+      remaining.send(JSON.stringify({ type: 'peer-disconnected' }));
+    }
+
+    if (peers.length === 0) {
+      rooms.delete(room);
+      console.log(`[Room ${room}] Room closed`);
+    }
+  };
+
+  ws.onerror = (err) => {
+    console.error(`[Room ${room}] WebSocket error:`, err.message);
+  };
 });
 
 // ─── Start ────────────────────────────────────────────────────────────────────
