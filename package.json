@@ -8,8 +8,6 @@
     "start": "node server/index.js"
   },
   "dependencies": {
-    "@netlify/blobs": "^10.7.12",
-    "@upstash/redis": "^1.38.2",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "form-data": "^4.0.6",

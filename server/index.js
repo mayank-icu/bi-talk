@@ -69,71 +69,18 @@ apiRouter.get('/ice-servers', (req, res) => {
   res.json({ iceServers });
 });
 
-// ─── HTTP Signaling for Serverless / Netlify Fallback ─────────────────────────
-// Uses Upstash Redis (HTTP-based) for persistent shared state across serverless invocations.
-// Falls back to in-memory Map for local development when UPSTASH env vars aren't set.
-const { Redis } = require('@upstash/redis');
-
+// ─── HTTP Signaling (In-Memory Room Store for 24/7 Servers) ─────────────────
 const memoryRooms = new Map();
 
-let _redis = null;
-function getRedis() {
-  if (_redis) return _redis;
-  const url = process.env.UPSTASH_REDIS_REST_URL;
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
-  if (url && token) {
-    _redis = new Redis({ url, token });
-    console.log('[RoomStore] Connected to Upstash Redis REST storage');
-    return _redis;
-  }
-  console.log('[RoomStore] Upstash credentials not set — using in-memory Map fallback');
-  return null;
-}
-
-const ROOM_TTL_SECONDS = 300; // auto-expire rooms after 5 min of inactivity
-
 async function getRoomData(room) {
-  const redis = getRedis();
-  if (redis) {
-    try {
-      let data = await redis.get(`room:${room}`);
-      if (data && typeof data === 'string') {
-        try { data = JSON.parse(data); } catch (e) { console.warn('[RoomStore] JSON parse error:', e.message); }
-      }
-      return data || null;
-    } catch (e) {
-      console.error('[RoomStore] Redis get error:', e.message);
-    }
-  }
   return memoryRooms.get(room) || null;
 }
 
 async function saveRoomData(room, data) {
-  const redis = getRedis();
-  if (redis) {
-    try {
-      const payload = typeof data === 'string' ? data : JSON.stringify(data);
-      await redis.set(`room:${room}`, payload, { ex: ROOM_TTL_SECONDS });
-      return;
-    } catch (e) {
-      if (e.message && e.message.includes('NOPERM')) {
-        console.error('❌ [RoomStore] UPSTASH PERMISSION ERROR: Your UPSTASH_REDIS_REST_TOKEN is Read-Only! Please replace it with the Read-Write token from Upstash console.');
-      }
-    }
-  }
   memoryRooms.set(room, data);
 }
 
 async function deleteRoomData(room) {
-  const redis = getRedis();
-  if (redis) {
-    try {
-      await redis.del(`room:${room}`);
-      return;
-    } catch (e) {
-      console.error('[RoomStore] Redis del error:', e.message);
-    }
-  }
   memoryRooms.delete(room);
 }
 
